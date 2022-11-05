@@ -181,6 +181,7 @@ Node *new_num(int val) {
 // 再帰的に使えるように先に宣言しておく
 Node *expr();
 Node *mul();
+Node *unary();
 Node *primary();
 
 // 目的：＋とーの演算子をパースする
@@ -201,19 +202,31 @@ Node *expr() {
 
 // 目的：*と/の演算子をパースする
 // mul : Node
-// mul = primary ("*" primary | "/" primary)*
+// mul = unary ("*" unary | "/" unary)*
 Node *mul() {
-  Node *node = primary();
+  Node *node = unary();
 
   for (;;) {
     if (consume('*'))
-      node = new_binary(ND_MUL, node, primary());
+      node = new_binary(ND_MUL, node, unary());
     else if (consume('/'))
-      node = new_binary(ND_DIV, node, primary());
+      node = new_binary(ND_DIV, node, unary());
     else
       return node;
   }
 }
+
+// 目的：正負の記号をパースする
+// unary : Node
+// unary = ("+" | "-")? unary | primary
+Node *unary() {
+  if (consume('+'))
+    return unary();
+  if (consume('-'))
+    return new_binary(ND_SUB, new_num(0), unary());
+  return primary();
+}
+
 
 // 目的：(expr)とnumをパースする
 // primary : Node
