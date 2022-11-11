@@ -1,55 +1,17 @@
 #include "9cc.h"
 
-// 目的：node を受け取り、そのアドレスをスタックに push する
-void gen_addr(Node *node) {
-  if (node->kind == ND_LVAR) {
-    int offset = (node->name - 'a' + 1) * 8;
-    printf("  lea rax, [rbp-%d]\n", offset);
-    printf("  push rax\n");
-    return;
-  }
-
-  error("not an lvalue");
-}
-
-void load() {
-  printf("  pop rax\n");
-  printf("  mov rax, [rax]\n");
-  printf("  push rax\n");
-}
-
-void store() {
-  printf("  pop rdi\n");
-  printf("  pop rax\n");
-  printf("  mov [rax], rdi\n");
-  printf("  push rdi\n");
-}
-
 
 // 目的：Node を受け取り、スタックマシンの要領でアセンブリコードを吐き出す
 // gen : Node -> アセンブリコードの吐き出し
-void gen (Node *node) {
+static void gen (Node *node) {
   switch (node->kind) {
   case ND_NUM:
-    printf("  push %d\n", node->val);
-    return;
-  case ND_EXPR_STMT:
-    gen(node->lhs);
-    printf("  add rsp, 8\n");
-    return;
-  case ND_LVAR: // 変数を右辺値として使う場合
-    gen_addr(node); // 変数のアドレスをスタックにプッシュ
-    load(); // スタックトップから変数のアドレスを取り出し、アドレス先の変数をスタックにpush
-    return;
-  case ND_ASSIGN:
-    gen_addr(node->lhs); // 左のノード（＝変数）を評価。変数のアドレスをスタックにプッシュ。
-    gen(node->rhs);
-    store(); // 変数のアドレスに値をstore
+    printf("  push %ld\n", node->val);
     return;
   case ND_RETURN:
     gen(node->lhs);
     printf("  pop rax\n");
-    printf("  jmp .Lreturn\n");
+    printf("  ret\n");
     return;
   }
 
@@ -105,19 +67,10 @@ void codegen(Node *node) {
   printf(".global main\n");
   printf("main:\n");
 
-  // プロローグ
-  // 変数26個分の領域を確保する
-  printf("  push rbp\n");
-  printf("  mov rbp, rsp\n");
-  printf("  sub rsp, 208\n");
+  for (Node *n = node; n; n = n->next) {
+    gen (n);
+    printf("  pop rax\n");
+  }
 
-  for (Node *n = node; n; n = n->next)
-    gen(n);
-
-  // エピローグ
-  // 最後の式の結果が RAX に残っているのでそれが返り値になる
-  printf(".Lreturn:\n");
-  printf("  mov rsp, rbp\n");
-  printf("  pop rbp\n");
   printf("  ret\n");
 }

@@ -41,15 +41,6 @@ bool consume(char *op) {
   return true;
 }
 
-// 次のトークンが変数の場合、トークンを1つ読み進めてそのトークンを返す
-Token *consume_ident() {
-  if (token->kind != TK_IDENT)
-    return NULL;
-  Token *t = token;
-  token = token->next;
-  return t;
-}
-
 // 次のトークンが期待している記号の時には、トークンを1つ読み進める。
 // それ以外の場合にはエラーを報告する。
 void expect(char *op) {
@@ -62,7 +53,7 @@ void expect(char *op) {
 
 // 次のトークンが数値の場合、トークンを１つ読み進めてその数値を返す。
 // それ以外の場合にはエラーを報告する。
-int expect_number() {
+long expect_number(void) {
   if (token->kind != TK_NUM)
     error_at(token->str, "数ではありません");
   int val = token->val;
@@ -77,7 +68,7 @@ bool at_eof() {
 }
 
 // 新しいトークンを作成してcurに繋げる
-Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
+static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
   Token *tok = calloc(1, sizeof(Token));
   tok->kind = kind;
   tok->str  = str;
@@ -88,28 +79,27 @@ Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
 
 // 目的：2つの文字列が等しいかどうかを調べる
 // startswith : char * -> char * ->　bool
-bool startswith(char *p, char *q) {
+static bool startswith(char *p, char *q) {
   return memcmp(p, q, strlen(q)) == 0;
 }
 
 // 目的：文字 c が a ~ z, A ~ Z, _ かを調べる
 // is_alpha : char -> bool
-bool is_alpha(char c) {
+static bool is_alpha(char c) {
   return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
 }
 
 // 目的：文字 c が is_alpha か 0 ~ 9 かを調べる
 // is_alnum : char -> bool
-bool is_alnum(char c) {
+static bool is_alnum(char c) {
   return is_alpha(c) || ('0' <= c && c <= '9');
 }
 
 
 // 入力文字列 p をトークナイズしてそれを返す
-Token *tokenize() {
+Token *tokenize(void) {
   char *p = user_input;
-  Token head;
-  head.next = NULL;
+  Token head = {};
   Token *cur = &head;
 
   while (*p) {
@@ -135,15 +125,8 @@ Token *tokenize() {
     }
 
     // 1文字のpunctuator
-    if (strchr("+-*/()<>=;", *p)) {
+    if (ispunct(*p)) {
       cur = new_token(TK_RESERVED, cur, p++, 1);
-      continue;
-    }
-
-    // Identifier
-    if ('a' <= *p && *p <= 'z')
-    {
-      cur = new_token(TK_IDENT, cur, p++, 1);
       continue;
     }
 

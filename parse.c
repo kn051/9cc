@@ -3,7 +3,7 @@
 
 // 目的：Nodeを新しく作る
 // new_node : NodeKind -> Node
-Node *new_node(NodeKind kind) {
+static Node *new_node(NodeKind kind) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
   return node;
@@ -11,14 +11,14 @@ Node *new_node(NodeKind kind) {
 
 // 目的：右辺と左辺を受け取る2項演算子のNodeを作る
 // new_binary : NodeKind -> Node -> Node -> Node
-Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
+static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
   Node *node = new_node(kind);
   node->lhs = lhs;
   node->rhs = rhs;
   return node;
 }
 
-Node *new_unary(NodeKind kind, Node *expr) {
+static Node *new_unary(NodeKind kind, Node *expr) {
   Node *node = new_node(kind);
   node->lhs = expr;
   return node;
@@ -26,34 +26,25 @@ Node *new_unary(NodeKind kind, Node *expr) {
 
 // 目的：数値のノードを新しく作る
 // new_num : int -> Node
-Node *new_num(int val) {
+static Node *new_num(int val) {
   Node *node = new_node(ND_NUM);
   node->val = val;
   return node;
 }
 
-// 目的：ローカル変数のノードを新しく作る
-// new_lvar : char -> Node
-Node *new_lvar(char name) {
-  Node *node = new_node(ND_LVAR);
-  node->name = name;
-  return node;
-}
 
-Node *stmt();
-Node *expr();
-Node *assign();
-Node *equality();
-Node *relational();
-Node *add();
-Node *mul();
-Node *unary();
-Node *primary();
+static Node *stmt(void);
+static Node *expr(void);
+static Node *equality(void);
+static Node *relational(void);
+static Node *add(void);
+static Node *mul(void);
+static Node *unary(void);
+static Node *primary(void);
 
 // 目的：
 Node *program() {
-  Node head;
-  head.next = NULL;
+  Node head = {};
   Node *cur = &head;
 
   while (!at_eof()) {
@@ -66,37 +57,28 @@ Node *program() {
 // stmt : Node
 // stmt ="return" expr ";"
 //      | expr ";"
-Node *stmt() {
+static Node *stmt(void) {
   if (consume("return")) {
     Node *node = new_unary(ND_RETURN, expr());
     expect(";");
     return node;
   }
 
-  Node *node = new_unary(ND_EXPR_STMT, expr());
+  Node *node = expr();
   expect(";");
   return node;
 }
 
 // expr : Node
-// expr = assign
-Node *expr() {
-  return assign();
-}
-
-// assign : Node
-// assign = equality ("=" assign)?
-Node *assign() {
-    Node *node = equality();
-    if (consume("="))
-      node = new_binary(ND_ASSIGN, node, assign());
-    return node;
+// expr = equality
+static Node *expr(void) {
+  return equality();
 }
 
 // 目的：== と != をパースする
 // equality : Node
 // equality = relational ("==" relational | "!=" relational)*
-Node *equality() {
+static Node *equality(void) {
   Node *node = relational();
 
   for (;;) {
@@ -112,7 +94,7 @@ Node *equality() {
 // 目的：<, <=, >, >= をパースする
 // relational : Node
 // relational = add ("<" add | "<=" add | ">" add | ">=" add)*
-Node *relational() {
+static Node *relational(void) {
   Node *node = add();
 
   for (;;) {
@@ -132,7 +114,7 @@ Node *relational() {
 // 目的：＋とーの演算子をパースする
 // add : Node
 // add = mul ("+" mul | "-" mul)*
-Node *add() {
+static Node *add(void) {
   Node *node = mul();
 
   for (;;) {
@@ -148,7 +130,7 @@ Node *add() {
 // 目的：*と/の演算子をパースする
 // mul : Node
 // mul = unary ("*" unary | "/" unary)*
-Node *mul() {
+static Node *mul(void) {
   Node *node = unary();
 
   for (;;) {
@@ -164,7 +146,7 @@ Node *mul() {
 // 目的：正負の記号をパースする
 // unary : Node
 // unary = ("+" | "-")? unary | primary
-Node *unary() {
+static Node *unary(void) {
   if (consume("+"))
     return unary();
   if (consume("-"))
@@ -175,17 +157,12 @@ Node *unary() {
 
 // 目的：(expr)とnumをパースする
 // primary : Node
-// primary = "(" expr ")" | ident | num
-Node *primary() {
+// primary = "(" expr ")" | num
+static Node *primary(void) {
   if (consume("(")) {
     Node *node = expr();
     expect(")");
     return node;
   }
-
-  Token *tok = consume_ident();
-  if (tok)
-    return new_lvar(*tok->str);
-  
   return new_num(expect_number());
 }
