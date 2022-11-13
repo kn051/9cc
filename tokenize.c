@@ -41,6 +41,17 @@ bool consume(char *op) {
   return true;
 }
 
+// 目的：トークンの種類が識別子かどうかを調べる。
+// 違う場合は NULL を返す。もしそうなら、トークンを1つ読み進めてそのポインタを返す。
+// consume_ident : Void -> NULL || *Token
+Token *consume_ident(void) {
+  if (token->kind != TK_IDENT)
+    return NULL;
+  Token *t = token;
+  token = token->next;
+  return t;
+}
+
 // 次のトークンが期待している記号の時には、トークンを1つ読み進める。
 // それ以外の場合にはエラーを報告する。
 void expect(char *op) {
@@ -109,10 +120,19 @@ Token *tokenize(void) {
       continue;
     }
 
-    // 目的：文字列 p が "return" の場合、新しいトークンを作る
+    // 文字列 p が "return" の場合、新しいトークンを作る
     if (startswith(p, "return") && !is_alnum(p[6])) {
       cur = new_token(TK_RESERVED, cur, p, 6);
       p += 6;
+      continue;
+    }
+
+    // 文字列 p が変数の場合、新しい識別子のトークンを作る
+    if (is_alpha(*p)) {
+      char *q = p;
+      while (is_alnum(*p))
+        p++;
+      cur = new_token(TK_IDENT, cur, q, p - q);
       continue;
     }
 

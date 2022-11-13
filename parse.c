@@ -1,5 +1,17 @@
 #include "9cc.h"
 
+// ローカル変数の連結リスト。パース中に作られたローカル変数はここに格納される
+Var *locals;
+
+// 目的：トークン列を受け取り、名前でローカル変数を検索する。見つからなかったらNULLを返す。
+// *find_var : *Token -> Var
+static Var *find_var(Token *tok) {
+  for (Var *var = locals; var; var = var->next)
+    if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
+      return var;
+    return NULL;
+}
+
 
 // 目的：Nodeを新しく作る
 // new_node : NodeKind -> Node
@@ -32,9 +44,28 @@ static Node *new_num(int val) {
   return node;
 }
 
+// 目的：Var 型のポインタを受け取り、変数のノードを新しく作る
+// new_var_node : *Var -> Node
+static Node *new_var_node(Var *var) {
+  Node *node = new_node(ND_VAR);
+  node->var = var;
+  return node;
+}
+
+// 目的：char 型の *name を受け取り、*name の名前を持つ変数を作る
+// *new_lvar : *char -> Var
+static Var *new_lvar(char *name) {
+  Var *var = calloc(1, sizeof(Var));
+  var->next = locals;
+  var->name = name;
+  locals = var;
+  return var;
+}
+
 
 static Node *stmt(void);
 static Node *expr(void);
+static Node *assign(void);
 static Node *equality(void);
 static Node *relational(void);
 static Node *add(void);
@@ -42,8 +73,10 @@ static Node *mul(void);
 static Node *unary(void);
 static Node *primary(void);
 
-// 目的：
-Node *program() {
+
+Function *program(void) {
+  locals = NULL;
+
   Node head = {};
   Node *cur = &head;
 
@@ -51,7 +84,12 @@ Node *program() {
     cur->next = stmt();
     cur = cur->next;
   }
-  return head.next;
+
+  Function *prog = calloc(1, sizeof(Function));
+  prog->node = head.next;
+  prog->locals = locals;
+  return prog;
+  
 }
 
 // stmt : Node
@@ -64,15 +102,24 @@ static Node *stmt(void) {
     return node;
   }
 
-  Node *node = expr();
+  Node *node = new_unary(ND_EXPR_STMT, expr());
   expect(";");
   return node;
 }
 
 // expr : Node
-// expr = equality
+// expr = assign
 static Node *expr(void) {
-  return equality();
+  return assign();
+}
+
+// assign : void -> Node
+// assign = equality ("=" assign)?
+static Node *assign(void) {
+  Node *node = equality();
+  if (consume("="))
+    node = new_binary(ND_ASSIGN, node, assign());
+  return node;
 }
 
 // 目的：== と != をパースする
@@ -155,14 +202,24 @@ static Node *unary(void) {
 }
 
 
-// 目的：(expr)とnumをパースする
+// 目的：(expr)、ident、numをパースする
 // primary : Node
-// primary = "(" expr ")" | num
+// primary = "(" expr ")" | ident | num
 static Node *primary(void) {
   if (consume("(")) {
     Node *node = expr();
     expect(")");
     return node;
   }
+
+  // 
+  Token *tok = consume_ident();
+  if (tok) {
+    Var *var = find_var(tok);
+    if (!var)
+      var = new_lvar(strndup(tok->str, tok->len));
+    return new_var_node(var);
+  }
+  
   return new_num(expect_number());
 }
