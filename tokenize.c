@@ -91,7 +91,7 @@ static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
 // 目的：2つの文字列が等しいかどうかを調べる
 // startswith : char * -> char * ->　bool
 static bool startswith(char *p, char *q) {
-  return memcmp(p, q, strlen(q)) == 0;
+  return memcmp(p, q, strlen(q)) == 0; // 文字列 q 分の長さだけ比較する
 }
 
 // 目的：文字 c が a ~ z, A ~ Z, _ かを調べる
@@ -104,6 +104,28 @@ static bool is_alpha(char c) {
 // is_alnum : char -> bool
 static bool is_alnum(char c) {
   return is_alpha(c) || ('0' <= c && c <= '9');
+}
+
+// 目的：文字列を受けとり、return, if, else のどれかに等しければ該当文字列を返す
+// *starts_with_reserved : char * -> char
+static char *starts_with_reserved(char *p) {
+  // キーワード
+  static char *kw[] = {"return", "if", "else"};
+
+  for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++) {
+    int len = strlen(kw[i]);
+    if (startswith(p, kw[i]) && !is_alnum(p[len]))
+      return kw[i];
+  }
+
+  // 複数文字の区切り記号 (punctuator)
+  static char *ops[] = {"==", "!=", "<=", ">="};
+
+  for (int i = 0; i < sizeof(ops) / sizeof(*ops); i++)
+    if (startswith(p, ops[i]))
+      return ops[i];
+  
+  return NULL;
 }
 
 
@@ -120,10 +142,12 @@ Token *tokenize(void) {
       continue;
     }
 
-    // 文字列 p が "return" の場合、新しいトークンを作る
-    if (startswith(p, "return") && !is_alnum(p[6])) {
-      cur = new_token(TK_RESERVED, cur, p, 6);
-      p += 6;
+    // 文字列 p がキーワード、あるいは複数文字の区切り記号の場合、新しいトークンを作る
+    char *kw = starts_with_reserved(p);
+    if (kw) {
+      int len = strlen(kw);
+      cur = new_token(TK_RESERVED, cur, p, len);
+      p += len;
       continue;
     }
 
@@ -136,13 +160,6 @@ Token *tokenize(void) {
       continue;
     }
 
-    // 複数文字のpunctuator
-    if (startswith(p, "==") || startswith(p, "!=") ||
-        startswith(p, "<=") || startswith(p, ">=")) {
-      cur = new_token(TK_RESERVED, cur, p, 2);
-      p += 2;
-      continue;
-    }
 
     // 1文字のpunctuator
     if (ispunct(*p)) {

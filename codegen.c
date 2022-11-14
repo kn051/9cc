@@ -1,5 +1,7 @@
 #include "9cc.h"
 
+static int labelseq = 1;
+
 // 目的：Nodeのポインタを受け取り、スタックにそのアドレスを push する
 // gen_addr : *Node -> アセンブリコードの吐き出し
 static void gen_addr(Node *node) {
@@ -50,6 +52,29 @@ static void gen (Node *node) {
     gen(node->rhs); // 式か何か
     store();  // 変数のアドレスに式の評価結果をストアする＝代入
     return;
+  case ND_IF: {
+    int seq = labelseq++;
+    // もし else があれば if ... else、ないときは else のない if としてコンパイルする
+    if (node->els) {
+      gen(node->cond);
+      printf("  pop rax\n");
+      printf("  cmp rax, 0\n");
+      printf("  je  .L.else.%d\n", seq);
+      gen(node->then);
+      printf("  jmp .L.end.%d\n", seq);
+      printf(".L.else.%d:\n", seq);
+      gen(node->els);
+      printf(".L.end.%d:\n", seq);
+    } else {
+      gen(node->cond);
+      printf("  pop rax\n");
+      printf("  cmp rax, 0\n");
+      printf("  je  .L.end.%d\n", seq);
+      gen(node->then);
+      printf(".L.end.%d:\n", seq);
+    }
+    return;
+  }
   case ND_RETURN:
     gen(node->lhs);
     printf("  pop rax\n");

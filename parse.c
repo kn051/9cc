@@ -92,8 +92,13 @@ Function *program(void) {
   
 }
 
+static Node *read_expr_stmt(void) {
+  return new_unary(ND_EXPR_STMT, expr());
+}
+
 // stmt : Node
 // stmt ="return" expr ";"
+//      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | expr ";"
 static Node *stmt(void) {
   if (consume("return")) {
@@ -102,7 +107,18 @@ static Node *stmt(void) {
     return node;
   }
 
-  Node *node = new_unary(ND_EXPR_STMT, expr());
+  if (consume("if")) {
+    Node *node = new_node(ND_IF);
+    expect("(");
+    node->cond = expr();
+    expect(")");
+    node->then = stmt();
+    if (consume("else"))
+      node->els = stmt();
+    return node;
+  }
+
+  Node *node = read_expr_stmt();
   expect(";");
   return node;
 }
