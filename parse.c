@@ -99,6 +99,7 @@ static Node *read_expr_stmt(void) {
 // stmt : Node
 // stmt ="return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "while" "(" expr ")" stmt
 //      | expr ";"
 static Node *stmt(void) {
   if (consume("return")) {
@@ -106,7 +107,8 @@ static Node *stmt(void) {
     expect(";");
     return node;
   }
-
+  
+  // if 文のパース
   if (consume("if")) {
     Node *node = new_node(ND_IF);
     expect("(");
@@ -115,6 +117,16 @@ static Node *stmt(void) {
     node->then = stmt();
     if (consume("else"))
       node->els = stmt();
+    return node;
+  }
+
+  // while 文のパース
+  if (consume("while")) {
+    Node *node = new_node(ND_WHILE);
+    expect("(");
+    node->cond = expr();
+    expect(")");
+    node->then = stmt();
     return node;
   }
 
