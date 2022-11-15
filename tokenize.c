@@ -35,7 +35,7 @@ void error_at(char *loc, char *fmt, ...) {
 bool consume(char *op) {
   if (token->kind != TK_RESERVED ||
       strlen(op) != token->len ||
-      memcmp(token->str, op, token->len)) // 引数1と引数2を引数3のバイト数分だけ比較する。=だと0、それ以外だと正負の値を返す
+      strncmp(token->str, op, token->len)) // 引数1と引数2を引数3のバイト数分だけ比較する。=だと0、それ以外だと正負の値を返す
     return false;
   token = token->next;
   return true;
@@ -57,7 +57,7 @@ Token *consume_ident(void) {
 void expect(char *op) {
   if (token->kind != TK_RESERVED ||
       strlen(op) != token->len ||
-      memcmp(token->str, op, token->len))
+      strncmp(token->str, op, token->len))
     error_at(token->str, "'%s'ではありません", op);
   token = token->next;
 }
@@ -67,7 +67,7 @@ void expect(char *op) {
 long expect_number(void) {
   if (token->kind != TK_NUM)
     error_at(token->str, "数ではありません");
-  int val = token->val;
+  long val = token->val;
   token = token->next;
   return val;
 }
@@ -91,7 +91,7 @@ static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
 // 目的：2つの文字列が等しいかどうかを調べる
 // startswith : char * -> char * ->　bool
 static bool startswith(char *p, char *q) {
-  return memcmp(p, q, strlen(q)) == 0; // 文字列 q 分の長さだけ比較する
+  return strncmp(p, q, strlen(q)) == 0; // 文字列 q 分の長さだけ比較する
 }
 
 // 目的：文字 c が a ~ z, A ~ Z, _ かを調べる
@@ -153,7 +153,7 @@ Token *tokenize(void) {
 
     // 文字列 p が変数の場合、新しい識別子のトークンを作る
     if (is_alpha(*p)) {
-      char *q = p;
+      char *q = p++;
       while (is_alnum(*p))
         p++;
       cur = new_token(TK_IDENT, cur, q, p - q);
