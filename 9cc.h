@@ -120,6 +120,7 @@ struct Node {
 
   // Function Call
   char *funcname;
+  Node *args;
   
   Var *var;      // kind が ND_VAR の場合のみ使う
   long val;       // kind が ND_NUM の場合のみ使う

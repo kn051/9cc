@@ -267,10 +267,26 @@ static Node *unary(void) {
 }
 
 
-// 目的：(expr)、ident、numをパースする
+// 目的：関数の引数をパースする
+// func_args : void -> Node | NULL
+// func_args = "(" (assign ("," assign)*)? ")"
+static Node *func_args(void) {
+  if (consume(")"))
+    return NULL;
+  
+  Node *head = assign();
+  Node *cur = head;
+  while (consume(",")) {
+    cur->next = assign();
+    cur = cur->next;
+  }
+  expect(")");
+  return head;
+}
+
+// 目的：(expr)、ident、func-args, numをパースする
 // primary : Node
-// primary = "(" expr ")" | ident args? | num
-// args = "(" ")"
+// primary = "(" expr ")" | ident func-args? | num
 static Node *primary(void) {
   if (consume("(")) {
     Node *node = expr();
@@ -278,14 +294,13 @@ static Node *primary(void) {
     return node;
   }
 
-
   Token *tok = consume_ident();
   if (tok) {
     // Function Call
     if (consume("(")) {
-      expect(")");
       Node *node = new_node(ND_FUNCALL);
       node->funcname = strndup(tok->str, tok->len);
+      node->args = func_args();
       return node;
     }
 
