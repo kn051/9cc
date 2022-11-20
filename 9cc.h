@@ -37,9 +37,11 @@ void error(char *fmt, ...);
 // fmt は入力の先頭を指しているポインタ
 void error_at(char *loc, char *fmt, ...);
 
+void error_tok(Token *tok, char *fmt, ...);
+
 // 次のトークンが期待している記号の時には、トークンを1つ読み進めて
 // 真を返す。それ以外の場合には偽を返す。
-bool consume(char *op);
+Token *consume(char *op);
 
 // 目的：トークンの種類が識別子かどうかを調べる。
 // 違う場合は NULL を返す。もしそうなら、トークンを1つ読み進めてそのポインタを返す。
@@ -114,6 +116,7 @@ typedef struct Node Node;
 struct Node {
   NodeKind kind;  // ノードの種類
   Node *next;     // 次のノード
+  Token *tok;     // Representative token
 
   Node *lhs;      // 左辺
   Node *rhs;      // 右辺
@@ -142,10 +145,10 @@ typedef struct Function Function;
 struct Function {
   Function *next;
   char *name;
-  VarList *params;
+  VarList *params; // 連結リストの引数
 
   Node *node;
-  VarList *locals;
+  VarList *locals; // 連結リストのローカル変数
   int stack_size;
 };
 

@@ -17,10 +17,7 @@ void error(char *fmt, ...) {
 // エラー箇所を報告する
 // loc は入力全体を表す文字列の途中を指しているポインタ
 // fmt は入力の先頭を指しているポインタ
-void error_at(char *loc, char *fmt, ...) {
-  va_list ap; 
-  va_start(ap, fmt); // 可変長引数を1個の変数にまとめる
-
+static void verror_at(char *loc, char *fmt, va_list ap) {
   int pos = loc - user_input; // 文字列の途中と先頭を指すポインタの差
   fprintf(stderr, "%s\n", user_input);
   fprintf(stderr, "%*s", pos, ""); // pos個の空白を出力
@@ -30,15 +27,28 @@ void error_at(char *loc, char *fmt, ...) {
   exit(1);
 }
 
+void error_at(char *loc, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(loc, fmt, ap);
+}
+
+void error_tok(Token *tok, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(tok->str, fmt, ap);
+}
+
 // 次のトークンが期待している記号の時には、トークンを1つ読み進めて
 // 真を返す。それ以外の場合には偽を返す。
-bool consume(char *op) {
+Token *consume(char *op) {
   if (token->kind != TK_RESERVED ||
       strlen(op) != token->len ||
       strncmp(token->str, op, token->len)) // 引数1と引数2を引数3のバイト数分だけ比較する。=だと0、それ以外だと正負の値を返す
-    return false;
+    return NULL;
+  Token *t = token;
   token = token->next;
-  return true;
+  return t;
 }
 
 // 目的：トークンの種類が識別子かどうかを調べる。
@@ -58,7 +68,7 @@ void expect(char *op) {
   if (token->kind != TK_RESERVED ||
       strlen(op) != token->len ||
       strncmp(token->str, op, token->len))
-    error_at(token->str, "'%s'ではありません", op);
+    error_tok(token, "'%s'ではありません", op);
   token = token->next;
 }
 
@@ -66,7 +76,7 @@ void expect(char *op) {
 // それ以外の場合にはエラーを報告する。
 long expect_number(void) {
   if (token->kind != TK_NUM)
-    error_at(token->str, "数ではありません");
+    error_tok(token, "数ではありません");
   long val = token->val;
   token = token->next;
   return val;
@@ -76,7 +86,7 @@ long expect_number(void) {
 // expect_ident : void -> char || NULL
 char *expect_ident(void) {
   if (token->kind != TK_IDENT)
-    error_at(token->str, "識別子ではありません");
+    error_tok(token, "識別子ではありません");
   char *s = strndup(token->str, token->len);
   token = token->next;
   return s;

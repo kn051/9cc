@@ -16,7 +16,7 @@ static void gen_addr(Node *node) {
     return;
   }
 
-  error("ローカル変数ではありません");
+  error_tok(node->tok, "ローカル変数ではありません");
 }
 
 // 目的：メモリから値をロードしてスタックに push する
