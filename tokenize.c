@@ -72,6 +72,16 @@ long expect_number(void) {
   return val;
 }
 
+// 目的：現在のトークンが識別子だった場合、トークンを１つ読み進めつつ、現在のトークンの識別子を返す。
+// expect_ident : void -> char || NULL
+char *expect_ident(void) {
+  if (token->kind != TK_IDENT)
+    error_at(token->str, "識別子ではありません");
+  char *s = strndup(token->str, token->len);
+  token = token->next;
+  return s;
+}
+
 // 目的：トークンの種類がTK_EOFかどうかを調べる
 // at_eof : bool
 bool at_eof() {

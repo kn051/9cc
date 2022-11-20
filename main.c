@@ -10,14 +10,16 @@ int main(int argc, char **argv) {
   token = tokenize();
   Function *prog = program();
 
-  // オフセットをローカル変数に割り当てる
-  int offset = 0;
-  for (Var *var = prog->locals; var; var = var->next) {
-    offset += 8;
-    var->offset = offset;
+  // 関数ごとにオフセットをローカル変数に割り当てる
+  for (Function *fn = prog; fn; fn = fn->next) {
+    int offset = 0;
+    for (VarList *vl = fn->locals; vl; vl = vl->next) {
+      offset += 8;
+      vl->var->offset = offset;
+    }
+    fn->stack_size = offset;
   }
-  prog->stack_size = offset;
-
+  
   // ASTをトラバースして、アセンブリのコードを吐き出す
   codegen(prog);
   return 0;

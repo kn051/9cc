@@ -1,7 +1,9 @@
 #include "9cc.h"
 
-static int labelseq = 1;
 static char *argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+
+static int labelseq = 1;
+static char *funcname;
 
 // 目的：Nodeのポインタを受け取り、スタックにそのアドレスを push する
 // gen_addr : *Node -> アセンブリコードの吐き出し
@@ -141,7 +143,7 @@ static void gen (Node *node) {
   case ND_RETURN:
     gen(node->lhs);
     printf("  pop rax\n");
-    printf("  jmp .L.return\n");
+    printf("  jmp .L.return.%s\n", funcname);
     return;
   }
 
@@ -194,20 +196,32 @@ static void gen (Node *node) {
 void codegen(Function *prog) {
   // アセンブリの前半部分を出力
   printf(".intel_syntax noprefix\n");
-  printf(".global main\n");
-  printf("main:\n");
+  for (Function *fn = prog; fn; fn = fn->next) {
+    printf(".global %s\n", fn->name);
+    printf("%s:\n", fn->name);
+    funcname = fn->name;
 
-  // プロローグ
-  printf("  push rbp\n"); // 元のベースポインタをスタックに push し保存
-  printf("  mov rbp, rsp\n"); // 保存されたベースポインタを指す rsp の位置にrbp を移動
-  printf("  sub rsp, %d\n", prog->stack_size); // 変数分のメモリを確保
+    // プロローグ
+    printf("  push rbp\n"); // 元のベースポインタをスタックに push し保存
+    printf("  mov rbp, rsp\n"); // 保存されたベースポインタを指す rsp の位置にrbp を移動
+    printf("  sub rsp, %d\n", fn->stack_size); // 変数分のメモリを確保
 
-  for (Node *node = prog->node; node; node = node->next)
-    gen(node);
+    // スタックに引数を push する
+    int i = 0;
+    for (VarList *vl = fn->params; vl; vl = vl->next) {
+      Var *var = vl->var;
+      printf("  mov [rbp-%d], %s\n", var->offset, argreg[i++]);
+    }
 
-  // エピローグ
-  printf(".L.return:\n");
-  printf("  mov rsp, rbp\n"); // rsp がリターンアドレスを指すようにする
-  printf("  pop rbp\n"); // rbp に元のベースポインタを書き戻す（＝元のベースポイントを指す）
-  printf("  ret\n"); // 呼び出し元の関数のリターンアドレスを pop し、そのアドレスにジャンプする
+    // コードの吐き出し
+    for (Node *node = fn->node; node; node = node->next)
+      gen(node);
+
+    // エピローグ
+    printf(".L.return.%s:\n", funcname);
+    printf("  mov rsp, rbp\n"); // rsp がリターンアドレスを指すようにする
+    printf("  pop rbp\n"); // rbp に元のベースポインタを書き戻す（＝元のベースポイントを指す）
+    printf("  ret\n"); // 呼び出し元の関数のリターンアドレスを pop し、そのアドレスにジャンプする
+
+  }
 }

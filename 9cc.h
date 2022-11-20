@@ -53,6 +53,10 @@ void expect(char *op);
 // それ以外の場合にはエラーを報告する。
 long expect_number(void);
 
+// 目的：現在のトークンが識別子だった場合、トークンを１つ読み進めてその識別子を返す。
+// expect_ident : void -> char || NULL
+char *expect_ident(void);
+
 // 目的：トークンの種類がTK_EOFかどうかを調べる
 // at_eof : bool
 bool at_eof(void);
@@ -72,9 +76,15 @@ extern Token *token;
 // ローカル変数の型
 typedef struct Var Var;
 struct Var {
-  Var *next;
   char *name; // 変数の名前
   int offset; // RBPからのオフセット
+};
+
+// ローカル変数の連結リストの型
+typedef struct VarList VarList;
+struct VarList {
+  VarList *next;
+  Var *var;
 };
 
 // 抽象構文木のノードの種類
@@ -130,8 +140,12 @@ struct Node {
 // 関数の型
 typedef struct Function Function;
 struct Function {
+  Function *next;
+  char *name;
+  VarList *params;
+
   Node *node;
-  Var *locals;
+  VarList *locals;
   int stack_size;
 };
 

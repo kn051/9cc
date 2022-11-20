@@ -1,15 +1,17 @@
 #include "9cc.h"
 
 // ローカル変数の連結リスト。パース中に作られたローカル変数はここに格納される
-Var *locals;
+static VarList *locals;
 
 // 目的：トークン列を受け取り、名前でローカル変数を検索する。見つからなかったらNULLを返す。
 // *find_var : *Token -> Var
 static Var *find_var(Token *tok) {
-  for (Var *var = locals; var; var = var->next)
+  for (VarList *vl = locals; vl; vl = vl->next) {
+    Var *var = vl->var;
     if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
       return var;
-    return NULL;
+  }
+  return NULL;
 }
 
 
@@ -56,13 +58,17 @@ static Node *new_var_node(Var *var) {
 // *new_lvar : *char -> Var
 static Var *new_lvar(char *name) {
   Var *var = calloc(1, sizeof(Var));
-  var->next = locals;
   var->name = name;
-  locals = var;
+
+  // ローカル変数の連結リストを作る
+  VarList *vl = calloc(1, sizeof(VarList));
+  vl->var = var;
+  vl->next = locals;
+  locals = vl;
   return var;
 }
 
-
+static Function *function(void);
 static Node *stmt(void);
 static Node *expr(void);
 static Node *assign(void);
@@ -74,23 +80,64 @@ static Node *unary(void);
 static Node *primary(void);
 
 
+// program = function*
 Function *program(void) {
+  Function head = {};
+  Function *cur = &head;
+
+  while (!at_eof()) {
+    cur->next = function();
+    cur = cur->next;
+  }
+  return head.next;
+}
+
+// 目的：関数のパラメーターをパースする
+// read_func_params : void -> NULL || VarList
+static VarList *read_func_params(void) {
+  if (consume(")"))
+    return NULL;
+
+  VarList *head = calloc(1, sizeof(VarList));
+  head->var = new_lvar(expect_ident());
+  VarList *cur = head;
+
+  while (!consume(")")) {
+    expect(",");
+    cur->next = calloc(1, sizeof(VarList));
+    cur->next->var = new_lvar(expect_ident());
+    cur = cur->next;
+
+  }
+
+  return head;
+}
+
+// 目的：関数をパースする
+// function = ident "(" params? ")" "{" stmt* "}"
+// params   = ident ("," ident)*
+static Function *function(void) {
   locals = NULL;
+
+  Function *fn = calloc(1, sizeof(Function));
+  fn->name = expect_ident();
+  expect("(");
+  fn->params = read_func_params();
+  expect("{");
 
   Node head = {};
   Node *cur = &head;
 
-  while (!at_eof()) {
+  while (!consume("}")) {
     cur->next = stmt();
     cur = cur->next;
   }
 
-  Function *prog = calloc(1, sizeof(Function));
-  prog->node = head.next;
-  prog->locals = locals;
-  return prog;
-  
+  fn->node = head.next;
+  fn->locals = locals;
+  return fn;
 }
+
 
 static Node *read_expr_stmt(void) {
   return new_unary(ND_EXPR_STMT, expr());
