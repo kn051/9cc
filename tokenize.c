@@ -27,12 +27,14 @@ static void verror_at(char *loc, char *fmt, va_list ap) {
   exit(1);
 }
 
+// エラー箇所を報告する
 void error_at(char *loc, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   verror_at(loc, fmt, ap);
 }
 
+// エラー箇所を報告する
 void error_tok(Token *tok, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -40,7 +42,7 @@ void error_tok(Token *tok, char *fmt, ...) {
 }
 
 // 次のトークンが期待している記号の時には、トークンを1つ読み進めて
-// 真を返す。それ以外の場合には偽を返す。
+// トークンのポインタを返す。違う場合は NULL を返す。
 Token *consume(char *op) {
   if (token->kind != TK_RESERVED ||
       strlen(op) != token->len ||

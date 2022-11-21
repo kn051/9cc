@@ -5,14 +5,20 @@ static char *argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static int labelseq = 1;
 static char *funcname;
 
+static void gen(Node *node);
+
 // 目的：Nodeのポインタを受け取り、スタックにそのアドレスを push する
 // gen_addr : *Node -> アセンブリコードの吐き出し
 static void gen_addr(Node *node) {
-  if (node->kind == ND_VAR) {
+  switch (node->kind) {
+  case ND_VAR:
     // 変数用のアドレスを確保する
     // lea dest, [src] : [src]内のアドレス値がそのまま dest に読み出される。 
     printf("  lea rax, [rbp-%d]\n", node->var->offset);
     printf("  push rax\n");
+    return;
+  case ND_DEREF:
+    gen(node->lhs);
     return;
   }
 
@@ -54,6 +60,13 @@ static void gen (Node *node) {
     gen_addr(node->lhs);  // 変数のアドレスをスタックにpush
     gen(node->rhs); // 式か何か
     store();  // 変数のアドレスに式の評価結果をストアする＝代入
+    return;
+  case ND_ADDR:
+    gen_addr(node->lhs);
+    return;
+  case ND_DEREF:
+    gen(node->lhs);
+    load();
     return;
   case ND_IF: {
     int seq = labelseq++;

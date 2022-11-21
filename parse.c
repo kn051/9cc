@@ -312,13 +312,17 @@ static Node *mul(void) {
 
 // 目的：正負の記号をパースする
 // unary : Node
-// unary = ("+" | "-")? unary | primary
+// unary = ("+" | "-" | "*" | "&")? unary
 static Node *unary(void) {
   Token *tok;
   if (consume("+"))
     return unary();
   if (tok = consume("-"))
     return new_binary(ND_SUB, new_num(0, tok), unary(), tok);
+  if (tok = consume("&"))
+    return new_unary(ND_ADDR, unary(), tok);
+  if (tok = consume ("*"))
+    return new_unary(ND_DEREF, unary(), tok);
   return primary();
 }
 
