@@ -2,10 +2,14 @@
 
 Type *int_type = &(Type){ TY_INT };
 
+// 目的：Type を受け取り、int 型かどうかを調べる
+// is_integer : Type -> bool
 bool is_integer(Type *ty) {
     return ty->kind == TY_INT;
 }
 
+// 目的：Type 型の base ポインタを受け取り、それを指すポインタ型の Type を返す
+// pointer_to : Type -> Type
 Type *pointer_to(Type *base) {
     Type *ty = calloc(1, sizeof(Type));
     ty->kind = TY_PTR;
@@ -13,6 +17,8 @@ Type *pointer_to(Type *base) {
     return ty;
 }
 
+// 目的：各ノードに型の情報を加える（int / ポインタ）
+// add_type : Node -> void (引数の Node に型情報を加える)
 void add_type(Node *node) {
     if (!node || node->ty)
         return;
@@ -31,6 +37,7 @@ void add_type(Node *node) {
         add_type(n);
     
     switch (node->kind) {
+        // 下記のケースでは、Nodeの型は int
         case ND_ADD:
         case ND_SUB:
         case ND_PTR_DIFF:
@@ -40,24 +47,30 @@ void add_type(Node *node) {
         case ND_NE:
         case ND_LT:
         case ND_LE:
-        case ND_VAR:
         case ND_FUNCALL:
         case ND_NUM:
             node->ty = int_type;
             return;
+        // 下記のケースでは、Nodeの型は左辺値の型
         case ND_PTR_ADD:
         case ND_PTR_SUB:
         case ND_ASSIGN:
             node->ty = node->lhs->ty;
             return;
+        // 下記のケースでは、Nodeの型は変数の型
+        case ND_VAR:
+            node->ty = node->var->ty;
+            return;
+        // ND_ADDR の Node の場合はポインタ型
         case ND_ADDR:   // &
             node->ty = pointer_to(node->lhs->ty);
             return;
+        // ND_DEREF の Node の場合
         case ND_DEREF:  // *
-            if (node->lhs->ty->kind == TY_PTR)
-                node->ty = node->lhs->ty->base;
-            else
-                node->ty = int_type;
+            // 左辺値の型がポインタの場合、base が指す型
+            if (node->lhs->ty->kind != TY_PTR)
+                error_tok(node->tok, "ポインタの参照が間違っています");
+            node->ty = node->lhs->ty->base;
             return;
     }
 }

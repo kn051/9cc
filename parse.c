@@ -4,7 +4,7 @@
 static VarList *locals;
 
 // 目的：トークン列を受け取り、名前でローカル変数を検索する。見つからなかったらNULLを返す。
-// *find_var : *Token -> Var
+// *find_var : *Token -> Var || NULL
 static Var *find_var(Token *tok) {
   for (VarList *vl = locals; vl; vl = vl->next) {
     Var *var = vl->var;
@@ -55,11 +55,12 @@ static Node *new_var_node(Var *var, Token *tok) {
   return node;
 }
 
-// 目的：char 型の *name を受け取り、*name の名前を持つ変数を作る
+// 目的：引数にとった型と名前の変数を新たに作り、ローカル変数の連結リストに繋げる
 // *new_lvar : *char -> Var
-static Var *new_lvar(char *name) {
+static Var *new_lvar(char *name, Type *ty) {
   Var *var = calloc(1, sizeof(Var));
   var->name = name;
+  var->ty = ty;
 
   // ローカル変数の連結リストを作る
   VarList *vl = calloc(1, sizeof(VarList));
@@ -70,6 +71,7 @@ static Var *new_lvar(char *name) {
 }
 
 static Function *function(void);
+static Node *declaration(void);
 static Node *stmt(void);
 static Node *stmt2(void);
 static Node *expr(void);
@@ -94,34 +96,53 @@ Function *program(void) {
   return head.next;
 }
 
-// 目的：関数のパラメーターをパースする
+// 目的：
+// basetype = "int" "*"*
+// basetype : void -> Type
+static Type *basetype(void) {
+  expect("int");
+  Type *ty = int_type;
+  while (consume("*"))
+    ty = pointer_to(ty);
+  return ty;
+}
+
+// 目的：関数の引数を1つパースする
+// read_func_param : void -> VarList
+static VarList *read_func_param(void) {
+  VarList *vl = calloc(1, sizeof(VarList));
+  Type *ty = basetype();
+  vl->var = new_lvar(expect_ident(), ty);
+  return vl;
+}
+
+// 目的：関数の引数を全てパースする
 // read_func_params : void -> NULL || VarList
 static VarList *read_func_params(void) {
   if (consume(")"))
     return NULL;
 
-  VarList *head = calloc(1, sizeof(VarList));
-  head->var = new_lvar(expect_ident());
+  VarList *head = read_func_param();
   VarList *cur = head;
 
   while (!consume(")")) {
     expect(",");
-    cur->next = calloc(1, sizeof(VarList));
-    cur->next->var = new_lvar(expect_ident());
+    cur->next = read_func_param();
     cur = cur->next;
-
   }
 
   return head;
 }
 
 // 目的：関数をパースする
-// function = ident "(" params? ")" "{" stmt* "}"
-// params   = ident ("," ident)*
+// function = basetype ident "(" params? ")" "{" stmt* "}"
+// params   = param ("," param)*
+// param    = basetype ident
 static Function *function(void) {
   locals = NULL;
 
   Function *fn = calloc(1, sizeof(Function));
+  basetype();
   fn->name = expect_ident();
   expect("(");
   fn->params = read_func_params();
@@ -140,6 +161,25 @@ static Function *function(void) {
   return fn;
 }
 
+// 目的：変数宣言をパースする
+// declaration = basetype ident ("=" expr) ";"
+// declaration : void -> Node
+static Node *declaration(void) {
+  Token *tok =token;
+  Type *ty = basetype();
+  Var *var = new_lvar(expect_ident(), ty);
+
+  if (consume(";"))
+    return new_node(ND_NULL, tok);
+  
+  expect("=");
+  Node *lhs = new_var_node(var, tok);
+  Node *rhs = expr();
+  expect(";");
+  Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
+  return new_unary(ND_EXPR_STMT, node, tok);
+}
+
 
 static Node *read_expr_stmt(void) {
   Token *tok = token;
@@ -153,11 +193,12 @@ static Node *stmt(void) {
 }
 
 // stmt2 : void -> Node
-// stmt2 ="return" expr ";"
+// stmt2 = "return" expr ";"
 //       | "if" "(" expr ")" stmt ("else" stmt)?
 //       | "while" "(" expr ")" stmt
 //       | "for" "(" expr? ";" expr? ";" expr? ")" stmt
 //       | "{" stmt* "}"
+//       | declaration
 //       | expr ";"
 static Node *stmt2(void) {
   Token *tok;
@@ -224,6 +265,9 @@ static Node *stmt2(void) {
     return node;
   }
 
+  if (tok = peek("int"))
+    return declaration();
+
   Node *node = read_expr_stmt();
   expect(";");
   return node;
@@ -283,6 +327,8 @@ static Node *relational(void) {
   }
 }
 
+// 目的：左辺値と右辺値を受け取り、型情報を加えて、式に応じた Node を返す
+// new_add : Node -> Node -> Token -> Node
 static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
   add_type(lhs);
   add_type(rhs);
@@ -296,6 +342,8 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok) {
   error_tok(tok, "演算子が間違っています");
 }
 
+// 目的：左辺値と右辺値を受け取り、型情報を加えて、式に応じた Node を返す
+// new_sub : Node -> Node -> Token -> Node
 static Node *new_sub(Node *lhs, Node *rhs, Token *tok) {
   add_type(lhs);
   add_type(rhs);
@@ -400,7 +448,7 @@ static Node *primary(void) {
 
     Var *var = find_var(tok);
     if (!var)
-      var = new_lvar(strndup(tok->str, tok->len));
+      error_tok(tok, "定義されていない変数です");
     return new_var_node(var, tok);
   }
   

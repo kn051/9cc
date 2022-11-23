@@ -41,6 +41,11 @@ void error_at(char *loc, char *fmt, ...);
 
 void error_tok(Token *tok, char *fmt, ...);
 
+// 目的：文字列を受け取り、現在のトークンとマッチするかどうかを調べる。
+// マッチしていれば、トークンを返す。
+// peek : char * -> Token || NULL
+Token *peek(char *s);
+
 // 次のトークンが期待している記号の時には、トークンを1つ読み進めて
 // 真を返す。それ以外の場合には偽を返す。
 Token *consume(char *op);
@@ -81,6 +86,7 @@ extern Token *token;
 typedef struct Var Var;
 struct Var {
   char *name; // 変数の名前
+  Type *ty;   // 型
   int offset; // RBPからのオフセット
 };
 
@@ -116,6 +122,7 @@ typedef enum {
   ND_EXPR_STMT, // Expression statement
   ND_VAR,       // Variable
   ND_NUM,       // Integer
+  ND_NULL,      // Empty statement
 } NodeKind;
 
 // ノードの型
@@ -153,27 +160,33 @@ typedef struct Function Function;
 struct Function {
   Function *next;
   char *name;
-  VarList *params; // 連結リストの引数
+  VarList *params; // 引数の連結リスト
 
   Node *node;
-  VarList *locals; // 連結リストのローカル変数
+  VarList *locals; // ローカル変数の連結リスト
   int stack_size;
 };
 
 Function *program(void);
 
 //
-// typing.c
+// type.c
 //
 
-typedef enum { TY_INT, TY_PTR } TypeKind;
+typedef enum {
+  TY_INT, // int型
+  TY_PTR  // ~へのポインタ型
+} TypeKind;
 
 struct Type {
   TypeKind kind;
-  Type *base;
+  Type *base; // 〜が指す Type オブジェクトへのポインタ。kind がTY_PTRの場合のみ使う。
 };
 
+extern Type *int_type;
+
 bool is_integer(Type *ty);
+Type *pointer_to(Type *base);
 void add_type(Node *node);
 
 
