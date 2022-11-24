@@ -107,12 +107,25 @@ static Type *basetype(void) {
   return ty;
 }
 
+// 目的：Type 型の base ポインタを受け取り、base の指す型と配列の要素数を持つ配列を返す
+// read_type_suffix : Type -> Type
+static Type *read_type_suffix(Type *base) {
+  if (!consume("["))
+    return base;
+  int sz = expect_number();
+  expect("]");
+  return array_of(base, sz);
+}
+
 // 目的：関数の引数を1つパースする
 // read_func_param : void -> VarList
 static VarList *read_func_param(void) {
-  VarList *vl = calloc(1, sizeof(VarList));
   Type *ty = basetype();
-  vl->var = new_lvar(expect_ident(), ty);
+  char *name = expect_ident();
+  ty = read_type_suffix(ty);
+
+  VarList *vl = calloc(1, sizeof(VarList));
+  vl->var = new_lvar(name, ty);
   return vl;
 }
 
@@ -162,12 +175,14 @@ static Function *function(void) {
 }
 
 // 目的：変数宣言をパースする
-// declaration = basetype ident ("=" expr) ";"
+// declaration = basetype ident ("[" num "]")* ("=" expr) ";"
 // declaration : void -> Node
 static Node *declaration(void) {
   Token *tok =token;
   Type *ty = basetype();
-  Var *var = new_lvar(expect_ident(), ty);
+  char *name = expect_ident();
+  ty = read_type_suffix(ty);
+  Var *var = new_lvar(name, ty);
 
   if (consume(";"))
     return new_node(ND_NULL, tok);

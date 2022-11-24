@@ -1,6 +1,6 @@
 #include "9cc.h"
 
-Type *int_type = &(Type){ TY_INT };
+Type *int_type = &(Type){ TY_INT, 8 };
 
 // 目的：Type を受け取り、int 型かどうかを調べる
 // is_integer : Type -> bool
@@ -13,7 +13,19 @@ bool is_integer(Type *ty) {
 Type *pointer_to(Type *base) {
     Type *ty = calloc(1, sizeof(Type));
     ty->kind = TY_PTR;
+    ty->size = 8;
     ty->base = base;
+    return ty;
+}
+
+// 目的：Type 型の base ポインタと配列の長さを受けとり、それらの型と要素数を持った配列を返す
+// array_of : Type -> int -> Type
+Type *array_of(Type *base, int len) {
+    Type *ty = calloc(1, sizeof(Type));
+    ty->kind = TY_ARRAY;
+    ty->size = base->size * len;
+    ty->base = base;
+    ty->array_len = len;
     return ty;
 }
 
@@ -63,12 +75,15 @@ void add_type(Node *node) {
             return;
         // ND_ADDR の Node の場合はポインタ型
         case ND_ADDR:   // &
-            node->ty = pointer_to(node->lhs->ty);
+            if (node->lhs->ty->kind == TY_ARRAY)
+                node->ty = pointer_to(node->lhs->ty->base);
+            else
+                node->ty = pointer_to(node->lhs->ty);
             return;
         // ND_DEREF の Node の場合
         case ND_DEREF:  // *
             // 左辺値の型がポインタの場合、base が指す型
-            if (node->lhs->ty->kind != TY_PTR)
+            if (!node->lhs->ty->base)
                 error_tok(node->tok, "ポインタの参照が間違っています");
             node->ty = node->lhs->ty->base;
             return;

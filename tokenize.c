@@ -136,7 +136,7 @@ static bool is_alnum(char c) {
   return is_alpha(c) || ('0' <= c && c <= '9');
 }
 
-// 目的：文字列を受けとり、return, if, else のどれかに等しければ該当文字列を返す
+// 目的：文字列を受けとり、return, if, else, while, for, int のどれかに等しければ該当文字列を返す
 // *starts_with_reserved : char * -> char
 static char *starts_with_reserved(char *p) {
   // キーワード
