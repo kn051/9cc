@@ -1,6 +1,7 @@
 #include "9cc.h"
 
-static char *argreg[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+static char *argreg1[] = {"dil", "sil", "dl", "cl", "r8b", "r9b"};
+static char *argreg8[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 
 static int labelseq = 1;
 static char *funcname;
@@ -41,17 +42,25 @@ static void gen_lval(Node *node) {
 }
 
 // 目的：メモリから値をロードしてスタックに push する
-static void load(void) {
+static void load(Type *ty) {
   printf("  pop rax\n");
-  printf("  mov rax, [rax]\n");
+  if (ty->size == 1)
+    printf("  movsx rax, byte ptr [rax]\n");
+  else
+    printf("  mov rax, [rax]\n");
   printf("  push rax\n");
 }
 
 // 目的：メモリに値を格納する
-static void store(void) {
+static void store(Type *ty) {
   printf("  pop rdi\n");
   printf("  pop rax\n");
-  printf("  mov [rax], rdi\n");
+
+  if (ty->size == 1)
+    printf("  mov [rax], dil\n");
+  else
+    printf("  mov [rax], rdi\n");
+
   printf("  push rdi\n");
 }
 
@@ -72,12 +81,12 @@ static void gen (Node *node) {
   case ND_VAR:
     gen_addr(node); // 変数のアドレスをスタックに push
     if (node->ty->kind != TY_ARRAY)
-      load(); // 変数をスタックに push
+      load(node->ty); // 変数をスタックに push
     return;
   case ND_ASSIGN:
     gen_lval(node->lhs);  // 変数のアドレスをスタックにpush
     gen(node->rhs); // 式か何か
-    store();  // 変数のアドレスに式の評価結果をストアする＝代入
+    store(node->ty);  // 変数のアドレスに式の評価結果をストアする＝代入
     return;
   case ND_ADDR:
     gen_addr(node->lhs);
@@ -85,7 +94,7 @@ static void gen (Node *node) {
   case ND_DEREF:
     gen(node->lhs);
     if (node->ty->kind != TY_ARRAY)
-      load();
+      load(node->ty);
     return;
   case ND_IF: {
     int seq = labelseq++;
@@ -152,7 +161,7 @@ static void gen (Node *node) {
     }
 
     for (int i = nargs - 1; i >= 0; i--)
-      printf("  pop %s\n", argreg[i]);
+      printf("  pop %s\n", argreg8[i]);
     
     // 関数を呼ぶ前に RSP を16バイトの倍数にする。ABI規約。
     // RAXは複数個の引数をとる関数用に 0 にセットする。
@@ -251,6 +260,18 @@ static void emit_data(Program *prog) {
   }
 }
 
+// 目的：変数とレジスタのインデックスを受け取り、変数のサイズに応じて引数を各レジスタに入れていく
+// load_arg : Var -> int -> void
+static void load_arg(Var *var, int idx) {
+  int sz = var->ty->size;
+  if (sz == 1) {
+    printf("  mov [rbp-%d], %s\n", var->offset, argreg1[idx]);
+  } else {
+    assert(sz == 8);
+    printf("  mov [rbp-%d], %s\n", var->offset, argreg8[idx]);
+  }
+}
+
 // 目的：関数ごとのアセンブリコードを吐き出す
 // emit_text : Program -> void
 static void emit_text(Program *prog) {
@@ -268,10 +289,8 @@ static void emit_text(Program *prog) {
 
     // スタックに引数を push する
     int i = 0;
-    for (VarList *vl = fn->params; vl; vl = vl->next) {
-      Var *var = vl->var;
-      printf("  mov [rbp-%d], %s\n", var->offset, argreg[i++]);
-    }
+    for (VarList *vl = fn->params; vl; vl = vl->next)
+      load_arg(vl->var, i++);
 
     // コードの吐き出し
     for (Node *node = fn->node; node; node = node->next)

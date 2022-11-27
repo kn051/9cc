@@ -1,11 +1,12 @@
 #include "9cc.h"
 
+Type *char_type = &(Type){ TY_CHAR, 1 };
 Type *int_type = &(Type){ TY_INT, 8 };
 
 // 目的：Type を受け取り、int 型かどうかを調べる
 // is_integer : Type -> bool
 bool is_integer(Type *ty) {
-    return ty->kind == TY_INT;
+    return ty->kind == TY_CHAR || ty->kind == TY_INT;
 }
 
 // 目的：Type 型の base ポインタを受け取り、それを指すポインタ型の Type を返す

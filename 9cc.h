@@ -185,6 +185,7 @@ Program *program(void);
 
 // 型の種類
 typedef enum {
+  TY_CHAR,    // 文字型
   TY_INT,     // int型
   TY_PTR,     // ~へのポインタ型
   TY_ARRAY,   // 配列の型
@@ -197,6 +198,7 @@ struct Type {
   int array_len;  // 配列の要素数を持つ変数
 };
 
+extern Type *char_type;
 extern Type *int_type;
 
 bool is_integer(Type *ty);
