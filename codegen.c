@@ -11,12 +11,19 @@ static void gen(Node *node);
 // gen_addr : *Node -> アセンブリコードの吐き出し
 static void gen_addr(Node *node) {
   switch (node->kind) {
-  case ND_VAR:
-    // 変数用のアドレスを確保する
-    // lea dest, [src] : [src]内のアドレス値がそのまま dest に読み出される。 
+  case ND_VAR: {
+    Var *var = node->var;
+    // 変数がローカル変数の場合、変数用のアドレスを確保する
+    // lea dest, [src] : [src]内のアドレス値がそのまま dest に読み出される。
+    if (var->is_local) { 
     printf("  lea rax, [rbp-%d]\n", node->var->offset);
     printf("  push rax\n");
+    } else {
+      // 変数がグローバル変数の場合。
+      printf("  push offset %s\n", var->name);
+    }
     return;
+  }
   case ND_DEREF:
     gen(node->lhs);
     return;
@@ -232,10 +239,24 @@ static void gen (Node *node) {
   printf("  push rax\n");
 }
 
-void codegen(Function *prog) {
-  // アセンブリの前半部分を出力
-  printf(".intel_syntax noprefix\n");
-  for (Function *fn = prog; fn; fn = fn->next) {
+// 目的：グローバル変数を吐き出す
+// emit_data : Program -> void
+static void emit_data(Program *prog) {
+  printf(".data\n");
+
+  for (VarList *vl = prog->globals; vl; vl = vl->next) {
+    Var *var = vl->var;
+    printf("%s:\n", var->name);
+    printf("  .zero %d\n", var->ty->size);
+  }
+}
+
+// 目的：関数ごとのアセンブリコードを吐き出す
+// emit_text : Program -> void
+static void emit_text(Program *prog) {
+  printf(".text\n");
+
+  for (Function *fn = prog->fns; fn; fn = fn->next) {
     printf(".global %s\n", fn->name);
     printf("%s:\n", fn->name);
     funcname = fn->name;
@@ -261,6 +282,11 @@ void codegen(Function *prog) {
     printf("  mov rsp, rbp\n"); // rsp がリターンアドレスを指すようにする
     printf("  pop rbp\n"); // rbp に元のベースポインタを書き戻す（＝元のベースポイントを指す）
     printf("  ret\n"); // 呼び出し元の関数のリターンアドレスを pop し、そのアドレスにジャンプする
-
   }
+}
+
+void codegen(Program *prog) {
+  printf(".intel_syntax noprefix\n");
+  emit_data(prog);
+  emit_text(prog);
 }

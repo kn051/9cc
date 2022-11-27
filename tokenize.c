@@ -136,7 +136,8 @@ static bool is_alnum(char c) {
   return is_alpha(c) || ('0' <= c && c <= '9');
 }
 
-// 目的：文字列を受けとり、return, if, else, while, for, int のどれかに等しければ該当文字列を返す
+// 目的：文字列を受けとり、return, if, else, while, for, int,
+// あるいは、複数文字の区切り記号のどれかに等しければ該当文字列を返す
 // *starts_with_reserved : char * -> char
 static char *starts_with_reserved(char *p) {
   // キーワード
@@ -175,13 +176,14 @@ Token *tokenize(void) {
     // 文字列 p がキーワード、あるいは複数文字の区切り記号の場合、新しいトークンを作る
     char *kw = starts_with_reserved(p);
     if (kw) {
-      int len = strlen(kw);
-      cur = new_token(TK_RESERVED, cur, p, len);
-      p += len;
+      int len = strlen(kw); // 該当キーワードの文字数
+      cur = new_token(TK_RESERVED, cur, p, len); // 新たなトークンを作り、cur に繋げる
+      p += len; // キーワードの文字数分、入力文字列を読み進める
       continue;
     }
 
-    // 文字列 p が変数の場合、新しい識別子のトークンを作る
+    // 文字列 p が変数の場合、新しい識別子のトークンを作る。
+    // 最初の文字は、a~z, A~Z, _のいずれか。
     if (is_alpha(*p)) {
       char *q = p++;
       while (is_alnum(*p))
@@ -192,6 +194,7 @@ Token *tokenize(void) {
 
 
     // 1文字のpunctuator
+    // ispunct() はライブラリ関数
     if (ispunct(*p)) {
       cur = new_token(TK_RESERVED, cur, p++, 1);
       continue;

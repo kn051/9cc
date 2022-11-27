@@ -2,11 +2,21 @@
 
 // ローカル変数の連結リスト。パース中に作られたローカル変数はここに格納される
 static VarList *locals;
+// グローバル変数の連結リスト。
+static VarList *globals;
 
 // 目的：トークン列を受け取り、名前でローカル変数を検索する。見つからなかったらNULLを返す。
 // *find_var : *Token -> Var || NULL
 static Var *find_var(Token *tok) {
+  // ローカル変数を見つける
   for (VarList *vl = locals; vl; vl = vl->next) {
+    Var *var = vl->var;
+    if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
+      return var;
+  }
+
+  // グローバル変数を見つける
+  for (VarList *vl = globals; vl; vl = vl->next) {
     Var *var = vl->var;
     if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
       return var;
@@ -24,7 +34,7 @@ static Node *new_node(NodeKind kind, Token *tok) {
   return node;
 }
 
-// 目的：右辺と左辺を受け取る2項演算子のNodeを作る
+// 目的：右辺と左辺を持つ2項演算子の Node を作る
 // new_binary : NodeKind -> Node -> Node -> Node
 static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok) {
   Node *node = new_node(kind, tok);
@@ -33,6 +43,8 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok) {
   return node;
 }
 
+// 目的：左辺のみを持つ単項演算子の Node を作る
+// new_unary : NodeKind -> Node -> Token -> Node
 static Node *new_unary(NodeKind kind, Node *expr, Token *tok) {
   Node *node = new_node(kind, tok);
   node->lhs = expr;
@@ -55,14 +67,22 @@ static Node *new_var_node(Var *var, Token *tok) {
   return node;
 }
 
-// 目的：引数にとった型と名前の変数を新たに作り、ローカル変数の連結リストに繋げる
-// *new_lvar : *char -> Var
-static Var *new_lvar(char *name, Type *ty) {
+// 目的：引数にとった型と名前の変数を新たに作る。ローカル変数かどうかの真偽値も入れる。
+// *new_lvar : char * -> Type -> bool -> Var
+static Var *new_var(char *name, Type *ty, bool is_local) {
+  // 引数の名前と型を持つ変数を作る
   Var *var = calloc(1, sizeof(Var));
   var->name = name;
   var->ty = ty;
+  var->is_local = is_local;
+  return var;
+}
 
-  // ローカル変数の連結リストを作る
+// 新たなローカル変数を作る。そして、ローカル変数の連結リストに繋げる。
+// new_lvar : char * -> Type -> var
+static Var *new_lvar(char *name, Type *ty) {
+  Var *var = new_var(name, ty, true);
+
   VarList *vl = calloc(1, sizeof(VarList));
   vl->var = var;
   vl->next = locals;
@@ -70,7 +90,21 @@ static Var *new_lvar(char *name, Type *ty) {
   return var;
 }
 
+// 新たなグローバル変数を作る。そして、グローバル変数の連結リストに繋げる。
+// new_gvar : char * -> Type -> var
+static Var *new_gvar(char *name, Type *ty) {
+  Var *var = new_var(name, ty, false);
+
+  VarList *vl = calloc(1, sizeof(VarList));
+  vl->var = var;
+  vl->next = globals;
+  globals = vl;
+  return var;
+}
+
 static Function *function(void);
+static Type *basetype(void);
+static void global_var(void);
 static Node *declaration(void);
 static Node *stmt(void);
 static Node *stmt2(void);
@@ -84,17 +118,38 @@ static Node *unary(void);
 static Node *postfix(void);
 static Node *primary(void);
 
-// 目的：プログラムをパースする
-// program = function*
-Function *program(void) {
+// 目的： トークンを1つ先読みし、次のトップレベルが関数かグローバル変数かを調べる。
+// is_function : void -> bool
+static bool is_function(void) {
+  Token *tok = token;
+  basetype();
+  bool isfunc = consume_ident() && consume("(");
+  token = tok;
+  return isfunc;
+}
+
+// program = (global-var | function)*
+// program : void -> Function
+Program *program(void) {
   Function head = {};
   Function *cur = &head;
+  globals = NULL;
 
+  // トークンが関数の場合、パースした関数を連結していく。
+  // トークンがグローバル変数の場合、パースしたグローバル変数を連結していく。
   while (!at_eof()) {
-    cur->next = function();
-    cur = cur->next;
+    if (is_function()) {
+      cur->next = function();
+      cur = cur->next;
+    } else {
+      global_var();
+    }
   }
-  return head.next;
+  
+  Program *prog = calloc(1, sizeof(Program));
+  prog->globals = globals;    // プログラムに含まれるグローバル変数
+  prog->fns = head.next;      // プログラムに含まれる関数
+  return prog;
 }
 
 // 目的：
@@ -176,6 +231,17 @@ static Function *function(void) {
   return fn;
 }
 
+// 目的：グローバル変数をパースする。program()で使う。
+// global-var = basetype ident ("[" num "]")* ";"
+// global_var : void -> void
+static void global_var(void) {
+  Type *ty = basetype();
+  char *name = expect_ident();
+  ty = read_type_suffix(ty);
+  expect(";");
+  new_gvar(name, ty);
+}
+
 // 目的：変数宣言をパースする
 // declaration = basetype ident ("[" num "]")* ("=" expr) ";"
 // declaration : void -> Node
@@ -203,6 +269,8 @@ static Node *read_expr_stmt(void) {
   return new_unary(ND_EXPR_STMT, expr(), tok);
 }
 
+// stmt : void -> Node
+// stmt = stmt2
 static Node *stmt(void) {
   Node *node = stmt2();
   add_type(node);
