@@ -17,6 +17,7 @@ typedef struct Type Type;
 typedef enum {
   TK_RESERVED, // 記号
   TK_IDENT,    // 識別子
+  TK_STR,      // 文字列リテラル
   TK_NUM,      // 整数トークン
   TK_EOF,      // 入力の終わりを表すトークン
 } TokenKind;
@@ -26,9 +27,12 @@ typedef struct Token Token;
 struct Token {
   TokenKind kind;
   Token *next;
-  long val;
-  char *str;
-  int len;
+  long val;         // トークンの種類がTK_NUMの場合、その値
+  char *str;        // トークンの文字列
+  int len;          // トークンの長さ
+
+  char *contents;   // 終端文字'\0'を含む文字列リテラル
+  char cont_len;    // 文字列リテラルの長さ
 };
 
 // エラーを報告するための関数
@@ -92,6 +96,10 @@ struct Var {
 
   // ローカル変数の場合のスタック上の位置
   int offset;     // RBPからのオフセット
+
+  // グローバル変数
+  char *contents;
+  int cont_len;
 };
 
 // ローカル変数の連結リストの型

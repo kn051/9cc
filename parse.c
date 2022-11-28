@@ -102,6 +102,15 @@ static Var *new_gvar(char *name, Type *ty) {
   return var;
 }
 
+// 目的：文字列リテラル用のメモリを確保する？
+// new_label : void -> char
+static char *new_label(void) {
+  static int cnt = 0;
+  char buf[20];
+  sprintf(buf, ".L.data.%d", cnt++); // buf に cnt を代入した".L.data.%d"を格納する
+  return strndup(buf, 20);  // buf に格納された文字列を複製して返す
+}
+
 static Function *function(void);
 static Type *basetype(void);
 static void global_var(void);
@@ -539,7 +548,8 @@ static Node *func_args(void) {
 
 // 目的：(expr)、sizeof、ident、func-args, numをパースする
 // primary : Node
-// primary = "(" expr ")" | "sizeof" unary | ident func-args? | num
+// primary = "(" expr ")" | "sizeof" unary | ident func-args? | str | num
+// args = "(" ident ("," ident)* ")"
 static Node *primary(void) {
   Token *tok;
 
@@ -571,6 +581,16 @@ static Node *primary(void) {
   }
   
   tok = token;
+  if (tok->kind == TK_STR) {
+    token = token->next;
+
+    Type *ty = array_of(char_type, tok->cont_len);
+    Var *var = new_gvar(new_label(), ty);
+    var->contents = tok->contents;
+    var->cont_len = tok->cont_len;
+    return new_var_node(var, tok);
+  }
+
   if (tok->kind != TK_NUM)
     error_tok(tok, "期待していた式です");
   return new_num(expect_number(), tok);

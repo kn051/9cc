@@ -173,6 +173,21 @@ Token *tokenize(void) {
       continue;
     }
 
+    // 文字列リテラルのトークン化
+    if (*p == '"') {
+      char *q = p++;  // 文字列の始まり
+      while (*p && *p != '"')
+        p++;
+      if (!*p)
+        error_at(q, "unclosed string literal"); // 文字列が " で閉じられてない
+      p++;
+
+      cur = new_token(TK_STR, cur, q, p - q);
+      cur->contents = strndup(q + 1, p - q - 2); // 文字列の始まりから、" を２つ分（- 2)除いた文字列だけ複製する
+      cur->cont_len = p - q - 1;
+      continue;
+    }
+
     // 文字列 p がキーワード、あるいは複数文字の区切り記号の場合、新しいトークンを作る
     char *kw = starts_with_reserved(p);
     if (kw) {
