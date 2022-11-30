@@ -159,6 +159,54 @@ static char *starts_with_reserved(char *p) {
   return NULL;
 }
 
+// 目的：文字を受け取り、エスケープ文字にして返す
+// get_escape_char : char -> char
+static char get_escape_char(char c) {
+  switch (c) {
+  case 'a': return '\a';
+  case 'b': return '\b';
+  case 't': return '\t';
+  case 'n': return '\n';
+  case 'v': return '\v';
+  case 'f': return '\f';
+  case 'r': return '\r';
+  case 'e': return 27;
+  case '0': return 0;
+  default : return c;
+  }
+}
+
+// 目的：トークンと文字列を受けとり、文字列リテラルの新しいトークンを返す
+// read_string_literal : Token -> char -> Token
+static Token *read_string_literal(Token *cur, char *start) {
+  char *p = start + 1;
+  char buf[1024];
+  int len = 0;
+
+  for (;;) {
+    if (len == sizeof(buf))
+      error_at(start, "string literal too large");
+    if (*p == '\0')
+      error_at(start, "unclosed string literal");
+    if (*p == '"')
+      break;
+    
+    if (*p == '\\') {
+      p++;
+      buf[len++] = get_escape_char(*p++);
+    } else {
+      buf[len++] = *p++;
+    }
+  }
+
+  Token *tok = new_token(TK_STR, cur, start, p - start + 1);
+  tok->contents = malloc(len + 1);
+  memcpy(tok->contents, buf, len);
+  tok->contents[len] = '\0';
+  tok->cont_len = len + 1;
+  return tok;
+}
+
 
 // 入力文字列 p をトークナイズしてそれを返す
 Token *tokenize(void) {
@@ -175,16 +223,8 @@ Token *tokenize(void) {
 
     // 文字列リテラルのトークン化
     if (*p == '"') {
-      char *q = p++;  // 文字列の始まり
-      while (*p && *p != '"')
-        p++;
-      if (!*p)
-        error_at(q, "unclosed string literal"); // 文字列が " で閉じられてない
-      p++;
-
-      cur = new_token(TK_STR, cur, q, p - q);
-      cur->contents = strndup(q + 1, p - q - 2); // 文字列の始まりから、" を２つ分（- 2)除いた文字列だけ複製する
-      cur->cont_len = p - q - 1;
+      cur = read_string_literal(cur, p);
+      p += cur->len;
       continue;
     }
 
