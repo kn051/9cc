@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -78,6 +79,8 @@ bool at_eof(void);
 // 入力文字列 p をトークナイズしてそれを返す
 Token *tokenize();
 
+// ファイルの名前
+extern char *filename;
 // 入力プログラム
 extern char *user_input;
 // 現在着目しているトークン
