@@ -10,15 +10,7 @@ static VarList *scope;
 // 目的：トークン列を受け取り、名前で変数を検索する。見つからなかったらNULLを返す。
 // *find_var : *Token -> Var || NULL
 static Var *find_var(Token *tok) {
-  // ローカル変数を見つける
   for (VarList *vl = scope; vl; vl = vl->next) {
-    Var *var = vl->var;
-    if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
-      return var;
-  }
-
-  // グローバル変数を見つける
-  for (VarList *vl = globals; vl; vl = vl->next) {
     Var *var = vl->var;
     if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
       return var;
