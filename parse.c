@@ -5,11 +5,13 @@ static VarList *locals;
 // グローバル変数の連結リスト。
 static VarList *globals;
 
-// 目的：トークン列を受け取り、名前でローカル変数を検索する。見つからなかったらNULLを返す。
+static VarList *scope;
+
+// 目的：トークン列を受け取り、名前で変数を検索する。見つからなかったらNULLを返す。
 // *find_var : *Token -> Var || NULL
 static Var *find_var(Token *tok) {
   // ローカル変数を見つける
-  for (VarList *vl = locals; vl; vl = vl->next) {
+  for (VarList *vl = scope; vl; vl = vl->next) {
     Var *var = vl->var;
     if (strlen(var->name) == tok->len && !strncmp(tok->str, var->name, tok->len))
       return var;
@@ -75,6 +77,11 @@ static Var *new_var(char *name, Type *ty, bool is_local) {
   var->name = name;
   var->ty = ty;
   var->is_local = is_local;
+
+  VarList *sc = calloc(1, sizeof(VarList));
+  sc->var = var;
+  sc->next = scope;
+  scope = sc;
   return var;
 }
 
@@ -230,6 +237,8 @@ static Function *function(void) {
   basetype();
   fn->name = expect_ident();
   expect("(");
+
+  VarList *sc = scope;
   fn->params = read_func_params();
   expect("{");
 
@@ -240,6 +249,7 @@ static Function *function(void) {
     cur->next = stmt();
     cur = cur->next;
   }
+  scope = sc;
 
   fn->node = head.next;
   fn->locals = locals;
@@ -361,10 +371,12 @@ static Node *stmt2(void) {
     Node head = {};
     Node *cur = &head;
 
+    VarList *sc = scope;
     while (!consume("}")) {
       cur->next = stmt();
       cur = cur->next;
     }
+    scope = sc;
 
     Node *node = new_node(ND_BLOCK, tok);
     node->body = head.next;
@@ -531,6 +543,8 @@ static Node *postfix(void) {
 // stmt-expr = "(" "{" stmt stmt* "}" ")"
 // Statement expression is a GNU C extension
 static Node *stmt_expr(Token *tok) {
+  VarList *sc = scope;
+
   Node *node = new_node(ND_STMT_EXPR, tok);
   node->body = stmt();
   Node *cur = node->body;
@@ -540,6 +554,8 @@ static Node *stmt_expr(Token *tok) {
     cur = cur->next;
   }
   expect(")");
+
+  scope = sc;
 
   if (cur->kind != ND_EXPR_STMT)
     error_tok(cur->tok, "stmt expr returning void is not supported");
