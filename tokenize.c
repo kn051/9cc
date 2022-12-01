@@ -35,7 +35,7 @@ static void verror_at(char *loc, char *fmt, va_list ap) {
       line_num++;
   
   // 見つかった行を、ファイル名と行番号と一緒に表示
-  int indent = fpritf(stderr, "%s:%d: ", filename, line_num);
+  int indent = fprintf(stderr, "%s:%d: ", filename, line_num);
   fprintf(stderr, "%.*s\n", (int)(end - line), line);
 
   // エラー箇所を"^"で指し示して、エラーメッセージを表示
@@ -240,6 +240,23 @@ Token *tokenize(void) {
       p++;
       continue;
     }
+
+    // 行コメントをスキップ
+    if (startswith(p, "//")) {
+      p += 2;
+      while (*p != '\n')
+        p++;
+      continue;
+    }
+
+    // ブロックコメントをスキップ
+    if (startswith(p, "/*")) {
+      char *q = strstr(p + 2, "*/");
+      if (!q)
+        error_at(p, "unclosed block comment");
+      p = q + 2;
+      continue;
+    } 
 
     // 文字列リテラルのトークン化
     if (*p == '"') {
