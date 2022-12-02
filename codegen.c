@@ -28,6 +28,12 @@ static void gen_addr(Node *node) {
   case ND_DEREF:
     gen(node->lhs);
     return;
+  case ND_MEMBER:
+    gen_addr(node->lhs);
+    printf("  pop rax\n");
+    printf("  add rax, %d\n", node->member->offset);
+    printf("  push rax\n");
+    return;
   }
 
   error_tok(node->tok, "ローカル変数ではありません");
@@ -79,6 +85,7 @@ static void gen (Node *node) {
     printf("  add rsp, 8\n");
     return;
   case ND_VAR:
+  case ND_MEMBER:
     gen_addr(node); // 変数のアドレスをスタックに push
     if (node->ty->kind != TY_ARRAY)
       load(node->ty); // 変数をスタックに push

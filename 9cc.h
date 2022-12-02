@@ -9,6 +9,7 @@
 #include <string.h>
 
 typedef struct Type Type;
+typedef struct Member Member;
 
 //
 // トークナイザー (tokenize.c)
@@ -126,6 +127,7 @@ typedef enum {
   ND_LT,        // <
   ND_LE,        // <=
   ND_ASSIGN,    // =
+  ND_MEMBER,    // . (struct member access)
   ND_ADDR,      // unary &
   ND_DEREF,     // unary *
   ND_RETURN,    // "return"
@@ -161,6 +163,9 @@ struct Node {
 
   // Block or statement expression
   Node *body;
+
+  // Struct member access
+  Member *member;
 
   // Function Call
   char *funcname;
@@ -201,13 +206,23 @@ typedef enum {
   TY_INT,     // int型
   TY_PTR,     // ~へのポインタ型
   TY_ARRAY,   // 配列の型
+  TY_STRUCT,  // 構造体の型
 } TypeKind;
 
 struct Type {
   TypeKind kind;
-  int size;       // sizeof()の値
-  Type *base;     // 〜が指す Type オブジェクトへのポインタ。kind がTY_PTRの場合のみ使う。
-  int array_len;  // 配列の要素数を持つ変数
+  int size;         // sizeof()の値
+  Type *base;       // 〜が指す Type オブジェクトへのポインタ。kind がTY_PTRの場合のみ使う。
+  int array_len;    // 配列の要素数を持つ変数
+  Member *members;  // 構造体のメンバー
+};
+
+// 構造体のメンバー
+struct Member {
+  Member *next;
+  Type *ty;
+  char *name;
+  int offset;
 };
 
 extern Type *char_type;
